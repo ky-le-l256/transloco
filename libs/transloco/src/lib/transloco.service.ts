@@ -753,35 +753,29 @@ export class TranslocoService implements OnDestroy {
       }
     }
 
-    const splitted = lang.split('/');
     const fallbacks = loadOptions.fallbackLangs;
     const nextLang = fallbacks![loadOptions.failedCounter!];
     this.failedLangs.add(lang);
 
+    const scope = getScopeFromLang(lang);
+    const currentLang = getLangFromScope(lang);
+    const resolvePath = scope ? `${scope}/${nextLang}` : nextLang;
+
     // This handles the case where a loaded fallback language is requested again
-    if (this.cache.has(nextLang)) {
-      this.handleSuccess(nextLang, this.getTranslation(nextLang));
+    if (this.cache.has(resolvePath)) {
+      this.handleSuccess(resolvePath, this.getTranslation(resolvePath));
       return EMPTY;
     }
 
-    const isFallbackLang = nextLang === splitted[splitted.length - 1];
+    const isFallbackLang = nextLang === currentLang;
 
     if (!nextLang || isFallbackLang) {
       let msg = `Unable to load translation and all the fallback languages`;
-      if (splitted.length > 1) {
+      if (scope) {
         msg += `, did you misspelled the scope name?`;
       }
 
       throw new Error(msg);
-    }
-
-    let resolveLang = nextLang;
-    // if it's scoped lang
-    if (splitted.length > 1) {
-      // We need to resolve it to:
-      // todos/langNotExists => todos/nextLang
-      splitted[splitted.length - 1] = nextLang;
-      resolveLang = splitted.join('/');
     }
 
     loadOptions.failedCounter!++;
@@ -790,7 +784,7 @@ export class TranslocoService implements OnDestroy {
       payload: getEventPayload(lang),
     });
 
-    return this.load(resolveLang, loadOptions);
+    return this.load(resolvePath, loadOptions);
   }
 
   private getMappedScope(scope: string): string {
