@@ -20,7 +20,7 @@ describe('Multiple fallbacks', () => {
             map(() => mockLangs[lang]),
             map((translation) => {
               if (
-                ['notExists', 'notExists2', 'fallbackNotExists'].includes(lang)
+                ['notExists', 'notExists2', 'fallbackNotExists', 'scope/notExists'].includes(lang)
               ) {
                 throw new Error('error');
               }
@@ -62,6 +62,43 @@ describe('Multiple fallbacks', () => {
 
       // clear the cache
       expect((service as any).cache.size).toEqual(1);
+    }));
+
+    it('should try to load the fallbackLang with scope when the desired scoped lang failed', fakeAsync(() => {
+      const scope = 'scope';
+      const fallbackLang = 'es';
+      const scopeAndLang = `${scope}/notExists`;
+      const scopeAndFallbackLang = `${scope}/${fallbackLang}`
+      const service = createService({ fallbackLang, failedRetries: 0 }, { loader });
+      const loadSpy = spyOn(service, 'load').and.callThrough();
+
+      service.load(scopeAndLang).subscribe();
+      runLoader(2);
+
+      expect(loadSpy).toHaveBeenCalledTimes(2);
+      expect(loadSpy.calls.argsFor(0)).toEqual([scopeAndLang]);
+      expect(loadSpy.calls.argsFor(1)).toEqual([scopeAndFallbackLang, { failedCounter: 1, fallbackLangs: [fallbackLang] }]);
+      expect(service.getActiveLang()).toEqual(fallbackLang);
+      expect((service as any).cache.size).toEqual(1);
+    }));
+
+    it('should try to load the fallbackLang with scope when the desired scoped lang failed and the fallbackLang without scope is in the cache already', fakeAsync(() => {
+      const scope = 'scope';
+      const fallbackLang = 'es';
+      const scopeAndLang = `${scope}/notExists`;
+      const scopeAndFallbackLang = `${scope}/${fallbackLang}`
+      const service = createService({ fallbackLang, failedRetries: 0 }, { loader });
+      (service as any).cache = new Map().set(fallbackLang, {});
+      const loadSpy = spyOn(service, 'load').and.callThrough();
+
+      service.load(scopeAndLang).subscribe();
+      runLoader(2);
+
+      expect(loadSpy).toHaveBeenCalledTimes(2);
+      expect(loadSpy.calls.argsFor(0)).toEqual([scopeAndLang]);
+      expect(loadSpy.calls.argsFor(1)).toEqual([scopeAndFallbackLang, { failedCounter: 1, fallbackLangs: [fallbackLang] }]);
+      expect(service.getActiveLang()).toEqual(fallbackLang);
+      expect((service as any).cache.size).toEqual(2);
     }));
 
     it('should load the fallbackLang only once', fakeAsync(() => {
